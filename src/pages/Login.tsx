@@ -30,7 +30,14 @@ const Login = () => {
     
     try {
       await login(email, password);
-      navigate('/dashboard');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      // Redirect based on user role
+      if (user.isAdmin) {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       // Error is handled in auth context
     }

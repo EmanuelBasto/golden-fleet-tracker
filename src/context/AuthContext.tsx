@@ -5,6 +5,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  isAdmin?: boolean;
 }
 
 interface AuthContextType {
@@ -46,14 +47,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // In a real app, you would validate with a backend
-      // This is just a mock implementation
-      
-      if (email === 'demo@example.com' && password === 'password') {
+      // Check for admin credentials
+      if (email.toUpperCase() === 'ADMIN@EJEMPLO.COM' && password === 'admin12345') {
+        const adminUser = {
+          id: 'admin',
+          name: 'Administrador',
+          email: 'admin@ejemplo.com',
+          isAdmin: true
+        };
+        
+        setUser(adminUser);
+        localStorage.setItem('user', JSON.stringify(adminUser));
+      }
+      // Check for regular user credentials
+      else if (email === 'demo@example.com' && password === 'password') {
         const user = {
           id: '1',
           name: 'Demo User',
-          email: 'demo@example.com'
+          email: 'demo@example.com',
+          isAdmin: false
         };
         
         setUser(user);
