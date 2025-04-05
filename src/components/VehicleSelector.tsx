@@ -1,13 +1,24 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useVehicle, Vehicle } from '@/context/VehicleContext';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Search, Car } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const VehicleSelector = () => {
   const { vehicles, setCurrentVehicle, updateTripData } = useVehicle();
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate loading data
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   const filteredVehicles = vehicles.filter(vehicle => 
     vehicle.plate.toLowerCase().includes(search.toLowerCase()) ||
@@ -52,7 +63,19 @@ const VehicleSelector = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredVehicles.length > 0 ? (
+            {loading ? (
+              // Skeleton loading state
+              Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={`skeleton-${index}`}>
+                  <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-36" /></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-24" /></TableCell>
+                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-6 w-32" /></TableCell>
+                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-6 w-20" /></TableCell>
+                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-6 w-20" /></TableCell>
+                </TableRow>
+              ))
+            ) : filteredVehicles.length > 0 ? (
               filteredVehicles.map((vehicle) => (
                 <TableRow 
                   key={vehicle.id}

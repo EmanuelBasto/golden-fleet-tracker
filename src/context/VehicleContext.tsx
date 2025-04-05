@@ -57,6 +57,7 @@ interface VehicleContextType {
   resetTripData: () => void;
   addRefuel: (refuel: RefuelData) => void;
   finishTrip: (endLocation: LocationData, finalKilometers: number, finalFuelLevel: number) => void;
+  addVehicle: (vehicle: Vehicle) => void;
 }
 
 // Mock data
@@ -99,6 +100,110 @@ const mockVehicles: Vehicle[] = [
     lastKilometers: 42000,
     lastFuelLevel: 45,
     lastMaintenanceDate: '2023-11-10'
+  },
+  {
+    id: '4',
+    plate: 'DEF-987',
+    model: 'Chevrolet Silverado',
+    year: 2023,
+    economicNumber: 'ECO-004',
+    location: 'Puebla',
+    color: 'Rojo',
+    fleetNumber: 'FL-02',
+    lastKilometers: 15200,
+    lastFuelLevel: 85,
+    lastMaintenanceDate: '2024-02-05'
+  },
+  {
+    id: '5',
+    plate: 'GHI-654',
+    model: 'Volkswagen Amarok',
+    year: 2022,
+    economicNumber: 'ECO-005',
+    location: 'León',
+    color: 'Azul',
+    fleetNumber: 'FL-03',
+    lastKilometers: 31500,
+    lastFuelLevel: 50,
+    lastMaintenanceDate: '2023-10-22'
+  },
+  {
+    id: '6',
+    plate: 'JKL-321',
+    model: 'Mitsubishi L200',
+    year: 2021,
+    economicNumber: 'ECO-006',
+    location: 'Querétaro',
+    color: 'Verde',
+    fleetNumber: 'FL-03',
+    lastKilometers: 27800,
+    lastFuelLevel: 65,
+    lastMaintenanceDate: '2024-01-15'
+  },
+  {
+    id: '7',
+    plate: 'MNO-742',
+    model: 'Dodge RAM 1500',
+    year: 2023,
+    economicNumber: 'ECO-007',
+    location: 'Tijuana',
+    color: 'Negro',
+    fleetNumber: 'FL-04',
+    lastKilometers: 18700,
+    lastFuelLevel: 70,
+    lastMaintenanceDate: '2024-02-28'
+  },
+  {
+    id: '8',
+    plate: 'PQR-159',
+    model: 'Isuzu D-Max',
+    year: 2022,
+    economicNumber: 'ECO-008',
+    location: 'Chihuahua',
+    color: 'Plata',
+    fleetNumber: 'FL-04',
+    lastKilometers: 23400,
+    lastFuelLevel: 55,
+    lastMaintenanceDate: '2023-12-10'
+  },
+  {
+    id: '9',
+    plate: 'STU-853',
+    model: 'Mazda BT-50',
+    year: 2021,
+    economicNumber: 'ECO-009',
+    location: 'Mérida',
+    color: 'Blanco',
+    fleetNumber: 'FL-05',
+    lastKilometers: 36800,
+    lastFuelLevel: 40,
+    lastMaintenanceDate: '2023-11-25'
+  },
+  {
+    id: '10',
+    plate: 'VWX-624',
+    model: 'GMC Sierra',
+    year: 2023,
+    economicNumber: 'ECO-010',
+    location: 'Cancún',
+    color: 'Café',
+    fleetNumber: 'FL-05',
+    lastKilometers: 12500,
+    lastFuelLevel: 90,
+    lastMaintenanceDate: '2024-03-10'
+  },
+  {
+    id: '11',
+    plate: 'YZA-475',
+    model: 'Toyota Tacoma',
+    year: 2022,
+    economicNumber: 'ECO-011',
+    location: 'Toluca',
+    color: 'Azul Marino',
+    fleetNumber: 'FL-06',
+    lastKilometers: 29300,
+    lastFuelLevel: 60,
+    lastMaintenanceDate: '2024-01-05'
   }
 ];
 
@@ -125,12 +230,17 @@ export const useVehicle = () => {
 };
 
 export const VehicleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [vehicles] = useState<Vehicle[]>(mockVehicles);
+  const [vehicles, setVehicles] = useState<Vehicle[]>(mockVehicles);
   const [currentVehicle, setCurrentVehicle] = useState<Vehicle | null>(null);
   const [tripData, setTripData] = useState<TripData>(initialTripData);
 
   // Load saved data from localStorage
   useEffect(() => {
+    const savedVehicles = localStorage.getItem('vehicles');
+    if (savedVehicles) {
+      setVehicles(JSON.parse(savedVehicles));
+    }
+
     const savedVehicle = localStorage.getItem('currentVehicle');
     if (savedVehicle) {
       setCurrentVehicle(JSON.parse(savedVehicle));
@@ -144,6 +254,10 @@ export const VehicleProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Save to localStorage when data changes
   useEffect(() => {
+    localStorage.setItem('vehicles', JSON.stringify(vehicles));
+  }, [vehicles]);
+
+  useEffect(() => {
     if (currentVehicle) {
       localStorage.setItem('currentVehicle', JSON.stringify(currentVehicle));
     } else {
@@ -154,6 +268,11 @@ export const VehicleProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     localStorage.setItem('tripData', JSON.stringify(tripData));
   }, [tripData]);
+
+  // Add new vehicle
+  const addVehicle = (vehicle: Vehicle) => {
+    setVehicles(prev => [...prev, vehicle]);
+  };
 
   // Update trip data
   const updateTripData = (data: Partial<TripData>) => {
@@ -193,6 +312,11 @@ export const VehicleProvider: React.FC<{ children: React.ReactNode }> = ({ child
         lastFuelLevel: finalFuelLevel
       };
       setCurrentVehicle(updatedVehicle);
+      
+      // Also update the vehicle in the vehicles array
+      setVehicles(prev => 
+        prev.map(v => v.id === currentVehicle.id ? updatedVehicle : v)
+      );
     }
   };
 
@@ -204,7 +328,8 @@ export const VehicleProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateTripData,
     resetTripData,
     addRefuel,
-    finishTrip
+    finishTrip,
+    addVehicle
   };
 
   return <VehicleContext.Provider value={value}>{children}</VehicleContext.Provider>;
