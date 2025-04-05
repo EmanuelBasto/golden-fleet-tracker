@@ -2,9 +2,15 @@
 import { useState, useEffect } from 'react';
 import { useVehicle, Vehicle } from '@/context/VehicleContext';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Car } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Car, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const VehicleSelector = () => {
   const { vehicles, setCurrentVehicle, updateTripData } = useVehicle();
@@ -50,59 +56,40 @@ const VehicleSelector = () => {
         />
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Placa</TableHead>
-              <TableHead className="hidden md:table-cell">Modelo</TableHead>
-              <TableHead className="hidden md:table-cell">No. Económico</TableHead>
-              <TableHead className="hidden lg:table-cell">Ubicación</TableHead>
-              <TableHead className="hidden lg:table-cell">Color</TableHead>
-              <TableHead className="hidden lg:table-cell">No. Flota</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              // Skeleton loading state
-              Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={`skeleton-${index}`}>
-                  <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                  <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-36" /></TableCell>
-                  <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-24" /></TableCell>
-                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-6 w-32" /></TableCell>
-                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-6 w-20" /></TableCell>
-                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-6 w-20" /></TableCell>
-                </TableRow>
-              ))
-            ) : filteredVehicles.length > 0 ? (
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="w-full justify-between">
+              <span>Seleccionar vehículo</span>
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-full" align="start" style={{ width: 'var(--radix-dropdown-menu-trigger-width)' }}>
+            {filteredVehicles.length > 0 ? (
               filteredVehicles.map((vehicle) => (
-                <TableRow 
+                <DropdownMenuItem
                   key={vehicle.id}
                   onClick={() => handleSelectVehicle(vehicle)}
-                  className="cursor-pointer hover:bg-muted"
+                  className="flex justify-between"
                 >
-                  <TableCell className="font-medium">{vehicle.plate}</TableCell>
-                  <TableCell className="hidden md:table-cell">{vehicle.model} ({vehicle.year})</TableCell>
-                  <TableCell className="hidden md:table-cell">{vehicle.economicNumber}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{vehicle.location}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{vehicle.color}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{vehicle.fleetNumber}</TableCell>
-                </TableRow>
+                  <span className="font-medium">{vehicle.plate} - {vehicle.model} ({vehicle.year})</span>
+                  <span className="text-muted-foreground text-sm">{vehicle.economicNumber}</span>
+                </DropdownMenuItem>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
-                  <div className="flex flex-col items-center text-muted-foreground">
-                    <Car className="h-12 w-12 mb-2" />
-                    <p>No se encontraron vehículos</p>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <div className="flex flex-col items-center text-muted-foreground p-4">
+                <Car className="h-12 w-12 mb-2" />
+                <p>No se encontraron vehículos</p>
+              </div>
             )}
-          </TableBody>
-        </Table>
-      </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 };

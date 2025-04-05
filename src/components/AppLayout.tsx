@@ -1,6 +1,7 @@
 
 import AppHeader from './AppHeader';
 import { useAuth } from '@/context/AuthContext';
+import { Toaster } from '@/components/ui/toaster';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ const AppLayout = ({ children, title }: AppLayoutProps) => {
           Sistema de Registro de Vehículos &copy; {new Date().getFullYear()}
         </div>
       </footer>
+      <Toaster />
     </div>
   );
 };

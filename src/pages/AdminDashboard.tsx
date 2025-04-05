@@ -1,7 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { useVehicle, Vehicle } from '@/context/VehicleContext';
 import AppLayout from '@/components/AppLayout';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { CheckIcon, BarChart3, LineChart, PieChart, RefreshCcw, TrendingUp, Droplet, Car, Plus, FileText } from 'lucide-react';
 import { 
@@ -38,22 +38,34 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  BarChart, 
-  Bar, 
-  LineChart as RechartsLineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-} from 'recharts';
+import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar, Line, Pie } from 'react-chartjs-2';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const generateMockHistory = (vehicles: Vehicle[]) => {
   const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -93,6 +105,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#C78F3D'
 
 const AdminDashboard = () => {
   const { vehicles, addVehicle } = useVehicle();
+  const { toast } = useToast();
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [vehicleHistory, setVehicleHistory] = useState<any[]>([]);
   const [chartType, setChartType] = useState<'distance' | 'fuel' | 'efficiency'>('distance');
@@ -145,6 +158,10 @@ const AdminDashboard = () => {
       lastFuelLevel: 0,
       lastMaintenanceDate: new Date().toISOString().split('T')[0]
     });
+    toast({
+      title: "Vehículo agregado",
+      description: "El vehículo ha sido agregado correctamente.",
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,51 +190,68 @@ const AdminDashboard = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Vehículos');
     XLSX.writeFile(workbook, 'Registro_de_Vehiculos.xlsx');
+    
+    toast({
+      title: "Exportación exitosa",
+      description: "Los datos han sido exportados a Excel correctamente.",
+    });
   };
 
   const selectedVehiclesData = vehicleHistory.filter(
     vh => selectedVehicles.includes(vh.vehicle.id)
   );
 
+  // Prepare data for Chart.js
   const getChartData = () => {
-    if (selectedVehicles.length === 0) return [];
+    if (selectedVehicles.length === 0) return null;
 
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    
     if (viewType === 'bar' || viewType === 'line') {
-      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      
-      return months.map(month => {
-        const monthData: any = { month };
-        
-        selectedVehiclesData.forEach(vData => {
-          const monthRecord = vData.monthlyData.find((d: any) => d.month === month);
-          if (monthRecord) {
-            const vehicleName = `${vData.vehicle.model} (${vData.vehicle.plate})`;
-            monthData[vehicleName] = chartType === 'distance' 
-              ? monthRecord.distance 
-              : chartType === 'fuel' 
-                ? monthRecord.fuel 
-                : monthRecord.efficiency;
-          }
+      // Prepare datasets for bar or line chart
+      const datasets = selectedVehiclesData.map((vData, index) => {
+        // Get the appropriate data array based on chart type
+        const dataValues = vData.monthlyData.map((d: any) => {
+          if (chartType === 'distance') return d.distance;
+          if (chartType === 'fuel') return d.fuel;
+          return d.efficiency;
         });
         
-        return monthData;
+        return {
+          label: `${vData.vehicle.model} (${vData.vehicle.plate})`,
+          data: dataValues,
+          backgroundColor: COLORS[index % COLORS.length],
+          borderColor: COLORS[index % COLORS.length],
+          borderWidth: viewType === 'line' ? 2 : 1,
+          fill: false,
+        };
       });
+      
+      return {
+        labels: months,
+        datasets
+      };
     }
     
     if (viewType === 'pie') {
-      return selectedVehiclesData.map(vData => {
-        const vehicleName = `${vData.vehicle.model} (${vData.vehicle.plate})`;
-        const value = chartType === 'distance' 
-          ? vData.totalDistance 
-          : chartType === 'fuel' 
-            ? vData.totalFuel 
-            : vData.averageEfficiency;
-            
-        return { name: vehicleName, value };
-      });
+      // Prepare data for pie chart
+      return {
+        labels: selectedVehiclesData.map(vData => `${vData.vehicle.model} (${vData.vehicle.plate})`),
+        datasets: [
+          {
+            data: selectedVehiclesData.map(vData => {
+              if (chartType === 'distance') return vData.totalDistance;
+              if (chartType === 'fuel') return vData.totalFuel;
+              return vData.averageEfficiency;
+            }),
+            backgroundColor: COLORS.slice(0, selectedVehiclesData.length),
+            borderWidth: 1,
+          },
+        ],
+      };
     }
     
-    return [];
+    return null;
   };
 
   const chartData = getChartData();
@@ -240,6 +274,45 @@ const AdminDashboard = () => {
       case 'fuel': return 'litros';
       case 'efficiency': return 'km/l';
     }
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: getChartTitle(),
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.y !== undefined) {
+              label += context.parsed.y + ' ' + getChartUnit();
+            } else if (context.parsed !== undefined) {
+              label += context.parsed + ' ' + getChartUnit();
+            }
+            return label;
+          }
+        }
+      }
+    },
+    scales: viewType !== 'pie' ? {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: getChartUnit(),
+        }
+      }
+    } : undefined,
   };
 
   return (
@@ -471,7 +544,7 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
-        {selectedVehicles.length > 0 && (
+        {selectedVehicles.length > 0 && chartData && (
           <Card>
             <CardHeader>
               <CardTitle>{getChartTitle()}</CardTitle>
@@ -484,73 +557,15 @@ const AdminDashboard = () => {
             <CardContent>
               <div className="h-[400px] w-full">
                 {viewType === 'bar' && (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={chartData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis unit={` ${getChartUnit()}`} />
-                      <Tooltip formatter={(value) => [`${value} ${getChartUnit()}`, '']} />
-                      <Legend />
-                      {selectedVehiclesData.map((vData, index) => (
-                        <Bar
-                          key={vData.vehicle.id}
-                          dataKey={`${vData.vehicle.model} (${vData.vehicle.plate})`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <Bar data={chartData} options={chartOptions} />
                 )}
 
                 {viewType === 'line' && (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsLineChart
-                      data={chartData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis unit={` ${getChartUnit()}`} />
-                      <Tooltip formatter={(value) => [`${value} ${getChartUnit()}`, '']} />
-                      <Legend />
-                      {selectedVehiclesData.map((vData, index) => (
-                        <Line
-                          key={vData.vehicle.id}
-                          type="monotone"
-                          dataKey={`${vData.vehicle.model} (${vData.vehicle.plate})`}
-                          stroke={COLORS[index % COLORS.length]}
-                          strokeWidth={2}
-                          dot={{ r: 5 }}
-                          activeDot={{ r: 8 }}
-                        />
-                      ))}
-                    </RechartsLineChart>
-                  </ResponsiveContainer>
+                  <Line data={chartData} options={chartOptions} />
                 )}
 
                 {viewType === 'pie' && (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPieChart>
-                      <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={true}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={120}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => [`${value} ${getChartUnit()}`, '']} />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
+                  <Pie data={chartData} options={chartOptions} />
                 )}
               </div>
             </CardContent>
