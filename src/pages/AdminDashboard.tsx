@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { useVehicle, Vehicle } from '@/context/VehicleContext';
 import AppLayout from '@/components/AppLayout';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
-import { CheckIcon, BarChart3, LineChart, PieChart, RefreshCcw, TrendingUp, Droplet, Car } from 'lucide-react';
+import { CheckIcon, BarChart3, LineChart, PieChart, RefreshCcw, TrendingUp, Droplet, Car, Plus, FileText } from 'lucide-react';
 import { 
   Select, 
   SelectContent, 
@@ -29,6 +28,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
   BarChart, 
   Bar, 
   LineChart as RechartsLineChart, 
@@ -43,20 +53,19 @@ import {
   Pie,
   Cell,
 } from 'recharts';
+import * as XLSX from 'xlsx';
 
-// Generate mock history data for demo purposes
 const generateMockHistory = (vehicles: Vehicle[]) => {
   const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
   
   return vehicles.map(vehicle => {
-    // Generate monthly data
     const monthlyData = months.map((month, index) => {
       const baseKm = vehicle.lastKilometers / 12;
-      const randomFactor = 0.8 + Math.random() * 0.4; // 0.8 to 1.2
+      const randomFactor = 0.8 + Math.random() * 0.4;
       const distance = Math.round(baseKm * randomFactor);
       
       const baseFuel = distance / 10;
-      const fuelRandomFactor = 0.85 + Math.random() * 0.3; // 0.85 to 1.15
+      const fuelRandomFactor = 0.85 + Math.random() * 0.3;
       const fuel = Math.round(baseFuel * fuelRandomFactor);
       
       return {
@@ -80,18 +89,29 @@ const generateMockHistory = (vehicles: Vehicle[]) => {
   });
 };
 
-// For the pie chart
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#C78F3D'];
 
 const AdminDashboard = () => {
-  const { vehicles } = useVehicle();
+  const { vehicles, addVehicle } = useVehicle();
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [vehicleHistory, setVehicleHistory] = useState<any[]>([]);
   const [chartType, setChartType] = useState<'distance' | 'fuel' | 'efficiency'>('distance');
   const [viewType, setViewType] = useState<'bar' | 'line' | 'pie'>('bar');
+  const [isAddVehicleOpen, setIsAddVehicleOpen] = useState(false);
+  const [newVehicle, setNewVehicle] = useState({
+    plate: '',
+    model: '',
+    year: new Date().getFullYear(),
+    economicNumber: '',
+    location: '',
+    color: '',
+    fleetNumber: '',
+    lastKilometers: 0,
+    lastFuelLevel: 0,
+    lastMaintenanceDate: new Date().toISOString().split('T')[0]
+  });
 
   useEffect(() => {
-    // Generate mock history data when vehicles change
     const history = generateMockHistory(vehicles);
     setVehicleHistory(history);
   }, [vehicles]);
@@ -104,16 +124,64 @@ const AdminDashboard = () => {
     );
   };
 
-  // Filter data for selected vehicles
+  const handleAddVehicle = () => {
+    addVehicle({
+      ...newVehicle,
+      id: Date.now().toString(),
+      year: Number(newVehicle.year),
+      lastKilometers: Number(newVehicle.lastKilometers),
+      lastFuelLevel: Number(newVehicle.lastFuelLevel)
+    });
+    setIsAddVehicleOpen(false);
+    setNewVehicle({
+      plate: '',
+      model: '',
+      year: new Date().getFullYear(),
+      economicNumber: '',
+      location: '',
+      color: '',
+      fleetNumber: '',
+      lastKilometers: 0,
+      lastFuelLevel: 0,
+      lastMaintenanceDate: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setNewVehicle(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const exportToExcel = () => {
+    const exportData = vehicles.map(vehicle => ({
+      'Placa': vehicle.plate,
+      'Modelo': vehicle.model,
+      'Año': vehicle.year,
+      'No. Económico': vehicle.economicNumber,
+      'Ubicación': vehicle.location,
+      'Color': vehicle.color,
+      'No. Flota': vehicle.fleetNumber,
+      'Kilometraje (km)': vehicle.lastKilometers,
+      'Combustible (L)': vehicle.lastFuelLevel,
+      'Último Mantenimiento': vehicle.lastMaintenanceDate
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Vehículos');
+    XLSX.writeFile(workbook, 'Registro_de_Vehiculos.xlsx');
+  };
+
   const selectedVehiclesData = vehicleHistory.filter(
     vh => selectedVehicles.includes(vh.vehicle.id)
   );
 
-  // Prepare data for the charts
   const getChartData = () => {
     if (selectedVehicles.length === 0) return [];
 
-    // For bar and line charts - by month
     if (viewType === 'bar' || viewType === 'line') {
       const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
       
@@ -136,7 +204,6 @@ const AdminDashboard = () => {
       });
     }
     
-    // For pie chart - totals by vehicle
     if (viewType === 'pie') {
       return selectedVehiclesData.map(vData => {
         const vehicleName = `${vData.vehicle.model} (${vData.vehicle.plate})`;
@@ -152,10 +219,9 @@ const AdminDashboard = () => {
     
     return [];
   };
-  
+
   const chartData = getChartData();
-  
-  // Chart title and units
+
   const getChartTitle = () => {
     const baseTitle = selectedVehicles.length > 1 
       ? 'Comparación de vehículos: ' 
@@ -167,7 +233,7 @@ const AdminDashboard = () => {
       case 'efficiency': return `${baseTitle}Rendimiento (km/l)`;
     }
   };
-  
+
   const getChartUnit = () => {
     switch (chartType) {
       case 'distance': return 'km';
@@ -179,7 +245,88 @@ const AdminDashboard = () => {
   return (
     <AppLayout title="Panel de Administrador">
       <div className="space-y-6">
-        {/* Header section with title and stats */}
+        <div className="flex justify-between items-center">
+          <h2 className="text-3xl font-bold tracking-tight">Administración de Vehículos</h2>
+          <div className="flex gap-2">
+            <Dialog open={isAddVehicleOpen} onOpenChange={setIsAddVehicleOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-[#C78F3D] hover:bg-[#C78F3D]/90">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Vehículo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Agregar Nuevo Vehículo</DialogTitle>
+                  <DialogDescription>
+                    Complete los datos del nuevo vehículo para agregarlo al sistema.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="plate">Placa</Label>
+                      <Input id="plate" name="plate" value={newVehicle.plate} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="model">Modelo</Label>
+                      <Input id="model" name="model" value={newVehicle.model} onChange={handleInputChange} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="year">Año</Label>
+                      <Input id="year" name="year" type="number" value={newVehicle.year} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="economicNumber">Número Económico</Label>
+                      <Input id="economicNumber" name="economicNumber" value={newVehicle.economicNumber} onChange={handleInputChange} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Ubicación</Label>
+                      <Input id="location" name="location" value={newVehicle.location} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="color">Color</Label>
+                      <Input id="color" name="color" value={newVehicle.color} onChange={handleInputChange} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fleetNumber">Número de Flota</Label>
+                      <Input id="fleetNumber" name="fleetNumber" value={newVehicle.fleetNumber} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastKilometers">Kilometraje Actual (km)</Label>
+                      <Input id="lastKilometers" name="lastKilometers" type="number" value={newVehicle.lastKilometers} onChange={handleInputChange} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="lastFuelLevel">Combustible Actual (L)</Label>
+                      <Input id="lastFuelLevel" name="lastFuelLevel" type="number" value={newVehicle.lastFuelLevel} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastMaintenanceDate">Último Mantenimiento</Label>
+                      <Input id="lastMaintenanceDate" name="lastMaintenanceDate" type="date" value={newVehicle.lastMaintenanceDate} onChange={handleInputChange} />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddVehicleOpen(false)}>Cancelar</Button>
+                  <Button className="bg-[#C78F3D] hover:bg-[#C78F3D]/90" onClick={handleAddVehicle}>Guardar</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Button variant="outline" onClick={exportToExcel}>
+              <FileText className="mr-2 h-4 w-4" />
+              Exportar Excel
+            </Button>
+          </div>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-[#C78F3D]/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -236,7 +383,6 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
-        {/* Control section */}
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -325,7 +471,6 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
-        {/* Chart section */}
         {selectedVehicles.length > 0 && (
           <Card>
             <CardHeader>
@@ -412,13 +557,14 @@ const AdminDashboard = () => {
           </Card>
         )}
 
-        {/* Stats Table */}
         <Card>
-          <CardHeader>
-            <CardTitle>Estadísticas de Vehículos</CardTitle>
-            <CardDescription>
-              Resumen detallado del rendimiento de cada vehículo
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Estadísticas de Vehículos</CardTitle>
+              <CardDescription>
+                Resumen detallado del rendimiento de cada vehículo
+              </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
